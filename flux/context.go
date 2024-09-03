@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-type H map[string]interface{}
+type Object map[string]interface{}
 
 // 代表一个http上下文
 type Context struct {
@@ -18,6 +18,7 @@ type Context struct {
 	StatusCode  int                 //响应状态码
 	middlewares []HandlerFunc       //中间件
 	index       int                 //记录当前执行到第几个中间件
+	engine      *Engine             //引擎实例
 }
 
 // 创建一个新的http上下文
@@ -70,7 +71,7 @@ func (c *Context) SetHeader(key string, value string) {
 // 设置失败响应
 func (c *Context) SetFail(code int, message string) {
 	c.index = len(c.middlewares) //跳过后续中间件
-	c.SetJSON(code, H{"message": message})
+	c.SetJSON(code, Object{"message": message})
 }
 
 // 设置字符串类型的响应
@@ -96,6 +97,16 @@ func (c *Context) SetHTML(code int, html string) {
 	c.SetHeader("Content-Type", "text/html")
 	c.SetStatus(code)
 	c.Writer.Write([]byte(html))
+}
+
+// 设置html模版类型的响应
+func (c *Context) SetHTMLTemplate(code int, name string, data interface{}) {
+	c.SetHeader("Content-Type", "text/html")
+	c.SetStatus(code)
+	if err := c.engine.renderTemplates.ExecuteTemplate(c.Writer, name, data); err != nil {
+		c.SetStatus(http.StatusInternalServerError)
+		c.Writer.Write([]byte(err.Error()))
+	}
 }
 
 // 设置字节类型的响应
